@@ -282,7 +282,7 @@ int cyw43_spi_transfer(cyw43_int_t *self, const uint8_t *tx, size_t tx_length, u
 
         // Set PIO disabled
         // Disabled only means it's not auto-running, has nothing to do with manual calls to execute code
-        pio_sm_set_enabled(bus_data->pio, bus_data->pio_sm, false);
+        //pio_sm_set_enabled(bus_data->pio, bus_data->pio_sm, false);  // PIO should stop writing on its own, DMA channel is empty
 
         // State: All TX bits have been sent
 
@@ -306,6 +306,9 @@ int cyw43_spi_transfer(cyw43_int_t *self, const uint8_t *tx, size_t tx_length, u
 
         // Re-patch to write
         bus_data->pio->instr_mem[bus_data->pio_offset] = cyw43_spi_w_program_instructions[0];
+
+
+
 
         __compiler_memory_barrier();
         memset(rx, 0, tx_length); // make sure we don't have garbage in what would have been returned data if using real SPI
