@@ -280,35 +280,36 @@ int cyw43_spi_transfer(cyw43_int_t *self, const uint8_t *tx, size_t tx_length, u
         // TODO Anything special required for the case where 0 bits are being read/written?
         dma_channel_wait_for_finish_blocking(bus_data->dma_out);
 
-        // Set PIO disabled
+        // Set PIO disabled so instructions can be rewritten
         // Disabled only means it's not auto-running, has nothing to do with manual calls to execute code
-        //pio_sm_set_enabled(bus_data->pio, bus_data->pio_sm, false);  // PIO should stop writing on its own, DMA channel is empty
+        pio_sm_set_enabled(bus_data->pio, bus_data->pio_sm, false);
 
-        // State: All TX bits have been sent
+        // State: Clock is LOW
+        // This is after the 32nd clock has fallen
 
-        // Perform these operations manually via direct exec calls
         // set pindirs, 0          side 0
         pio_sm_exec(bus_data->pio, bus_data->pio_sm, pio_encode_set(pio_pindirs, 0) | pio_encode_sideset(1, 0));
-        // nop                     side 1
-        pio_sm_exec(bus_data->pio, bus_data->pio_sm, pio_encode_nop() | pio_encode_sideset(1, 1));
 
-        // Patch SM instruction
-        // Only need to change the first one, second is just a NOP anyway.
-        bus_data->pio->instr_mem[bus_data->pio_offset] = cyw43_spi_r_program_instructions[0];
+        // Patch SM instructions
+        uint16_t instr0 = cyw43_spi_r_program_instructions[0];
+        uint16_t instr1 = cyw43_spi_r_program_instructions[1] | bus_data->pio_offset;
+        bus_data->pio->instr_mem[bus_data->pio_offset] = instr0;
+        bus_data->pio->instr_mem[bus_data->pio_offset + 1] = instr1;
 
-        // Explicitly jump to the first instruction in the now-read SM
-        pio_sm_exec(bus_data->pio, bus_data->pio_sm, pio_encode_jmp(bus_data->pio_offset));
+        // Explicitly jump to the second instruction in the now-read SM
+        // 33rd clock high here after enabling the PIO unit
+        pio_sm_exec(bus_data->pio, bus_data->pio_sm, pio_encode_jmp(bus_data->pio_offset + 1) | pio_encode_sideset(1, 0));
 
-        // Start the PIO unit again
+        // Re-enable the PIO unit
         pio_sm_set_enabled(bus_data->pio, bus_data->pio_sm, true);
 
         dma_channel_wait_for_finish_blocking(bus_data->dma_in);
 
         // Re-patch to write
-        bus_data->pio->instr_mem[bus_data->pio_offset] = cyw43_spi_w_program_instructions[0];
-
-
-
+        uint16_t instr0w = cyw43_spi_w_program_instructions[0];
+        uint16_t instr1w = cyw43_spi_w_program_instructions[1] | bus_data->pio_offset;
+        bus_data->pio->instr_mem[bus_data->pio_offset] = instr0w;
+        bus_data->pio->instr_mem[bus_data->pio_offset + 1] = instr1w;
 
         __compiler_memory_barrier();
         memset(rx, 0, tx_length); // make sure we don't have garbage in what would have been returned data if using real SPI

@@ -31,7 +31,7 @@ lp: out pins, 1             side 0
     jmp x-- lp              side 1
 public lp1_end:
     set pindirs, 0          side 0
-    nop                     side 1
+    nop                     side 1  ;; 33rd clock
 lp2:
     in pins, 1              side 0
     jmp y-- lp2             side 1
