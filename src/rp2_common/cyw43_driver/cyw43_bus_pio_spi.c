@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#pragma GCC push_options
+#pragma GCC optimize ("-O0")
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -70,7 +73,7 @@ __force_inline static uint32_t __swap16x2(uint32_t a) {
 #define SWAP32(a) __swap16x2(a)
 
 #ifndef CYW43_SPI_PIO_PREFERRED_PIO
-#define CYW43_SPI_PIO_PREFERRED_PIO 1
+#define CYW43_SPI_PIO_PREFERRED_PIO 0
 #endif
 static_assert(CYW43_SPI_PIO_PREFERRED_PIO >=0 && CYW43_SPI_PIO_PREFERRED_PIO < NUM_PIOS, "");
 
@@ -95,10 +98,10 @@ int cyw43_spi_init(cyw43_int_t *self) {
     uint pio_index = CYW43_SPI_PIO_PREFERRED_PIO;
     // Check we can add the program
     if (!pio_can_add_program(pios[pio_index], &SPI_PROGRAM_FUNC)) {
-        pio_index ^= 1;
-        if (!pio_can_add_program(pios[pio_index], &SPI_PROGRAM_FUNC)) {
+        // pio_index ^= 1;  // not a preference, it's required to use specified PIO
+        // if (!pio_can_add_program(pios[pio_index], &SPI_PROGRAM_FUNC)) {
             return CYW43_FAIL_FAST_CHECK(-CYW43_EIO);
-        }
+        // }
     }
     assert(!self->bus_data);
     self->bus_data = &bus_data_instance;
@@ -582,3 +585,5 @@ int cyw43_write_bytes(cyw43_int_t *self, uint32_t fn, uint32_t addr, size_t len,
     }
 }
 #endif
+
+#pragma GCC pop_options
